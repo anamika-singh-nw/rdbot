@@ -1,0 +1,30 @@
+{"q": "When is Dr Deepthi Bawa available?", "expect": ["doctor:dr-deepthi-bawa"]}
+{"q": "Which days does Dr Chirag D see patients?", "expect": ["doctor:dr-chirag-d"]}
+{"q": "Is Dr Santosh Kumar M a urologist?", "expect": ["doctor:dr-santosh-kumar-m"]}
+{"q": "What are Dr Prashanth Nagaraj's qualifications?", "expect": ["doctor:dr-prashanth-nagaraj"]}
+{"q": "Does Dr Gummadi Anish Reddy offer teleconsultation?", "expect": ["doctor:dr-gummadi-anish-reddy"]}
+{"q": "I need a skin doctor", "expect": ["specialty:dermatology", "dept:Dermatology"]}
+{"q": "kidney specialist", "expect": ["specialty:nephrology", "dept:Nephrology"]}
+{"q": "heart doctor in Whitefield", "expect": ["specialty:cardiology", "dept:Cardiology"]}
+{"q": "Who can I see for knee pain from running?", "expect": ["specialty:orthopaedics", "specialty:sports-medicine", "dept:Orthopaedic", "dept:Sports", "page:sports-medicine"]}
+{"q": "gynaecologist in Malleshwaram", "expect": ["specialty:obstetrics-gynaecology", "dept:Gynaecology"]}
+{"q": "eye checkup", "expect": ["specialty:ophthalmology", "dept:Ophthalmology"]}
+{"q": "Do you have a psychiatrist?", "expect": ["specialty:psychiatry", "dept:Psychiatry"]}
+{"q": "ENT doctor for my child", "expect": ["specialty:paediatric-ent", "specialty:ent", "dept:ENT"]}
+{"q": "dentist for root canal", "expect": ["specialty:dentistry", "specialty:endodontist", "dept:Dent", "dept:Endodont"]}
+{"q": "child specialist in Malleshwaram", "expect": ["page:paediatricians-in-malleshwaram", "specialty:paediatrics", "dept:Paediatric"]}
+{"q": "Which doctors are at the Kadugodi clinic?", "expect": ["branch:rxdx-kadugodi"]}
+{"q": "doctors at Jakkur", "expect": ["branch:rxdx-jakkur"]}
+{"q": "Can someone collect a blood sample from my home?", "expect": ["page:home-healthcare"]}
+{"q": "Do you offer nurse visits at home?", "expect": ["page:home-healthcare"]}
+{"q": "What health check-up packages do you have?", "expect": ["page:health-check-packages"]}
+{"q": "Can I get an MRI or X-ray done?", "expect": ["page:lab-and-radiology"]}
+{"q": "Which adult vaccines are available?", "expect": ["page:adult-vaccination"]}
+{"q": "Do you have a pharmacy that delivers medicines?", "expect": ["page:pharmacy"]}
+{"q": "What is CIPRA.ai?", "expect": ["page:cipra-ai", "page:diabetes-management-with-cipra", "page:hypertension-management-with-cipra"]}
+{"q": "app to manage my blood pressure", "expect": ["page:hypertension-management-with-cipra", "page:cipra-ai"]}
+{"q": "Is there a gym in Malleshwaram?", "expect": ["page:gym-and-fitness-centre"]}
+{"q": "What is your WhatsApp number?", "expect": ["contact"]}
+{"q": "How quickly do you reply to enquiry forms?", "expect": ["contact"]}
+{"q": "How do you use my personal health data?", "expect": ["page:privacy-policy"]}
+{"q": "Are there job openings at RxDx?", "expect": ["page:careers-at-rxdx"]}

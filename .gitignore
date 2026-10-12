@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Built artefacts (rebuild with `python -m rxdx_qna build`)
+index/
+
+# Credentials — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+.DS_Store
