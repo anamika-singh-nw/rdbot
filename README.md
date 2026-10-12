@@ -15,3 +15,14 @@ whole repository for anything that looks like a key or token.
 
 Both projects share one knowledge base, [`data/rxdx.json`](data/) — a 2026-08-26 snapshot of
 rxdx.in (254 doctors, 14 branches, 49 specialities, 26 service pages).
+
+## Try them in a browser (local demo)
+
+```bash
+rag-qna/.venv/bin/python demo/server.py     # after setting up rag-qna (see its README)
+# open http://127.0.0.1:8765
+```
+
+One page with a tab for each bot. Answers come through your logged-in `claude` CLI, so no
+API key is needed. The server only listens on this computer and runs on your Claude
+subscription, so it's for demos, not for sharing.

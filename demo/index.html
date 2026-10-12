@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RxDx Bots</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --panel: #ffffff; --ink: #0f1b2d; --muted: #5b6b80; --line: #e2e8f0;
+    --navy: #13294b; --pulse: #0e7a4f; --pulse-soft: #e6f4ee; --user: #13294b; --user-ink: #ffffff;
+    --warn: #b42318; --warn-soft: #fdecea; --chip: #eef2f7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1220; --panel: #121b2e; --ink: #e6edf7; --muted: #94a3b8; --line: #23304a;
+      --navy: #8fb3ff; --pulse: #4ade9b; --pulse-soft: #10291f; --user: #2a4a86; --user-ink: #ffffff;
+      --warn: #ff8a80; --warn-soft: #3a1714; --chip: #1b2740;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  header { padding: 20px 16px 0; max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 2px; color: var(--navy); letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); }
+  .tab { border: 0; background: none; padding: 10px 14px; font: inherit; color: var(--muted);
+         cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--pulse); font-weight: 600; }
+  .tab small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+  main { max-width: 860px; margin: 0 auto; padding: 0 16px 140px; }
+  .pane { display: none; } .pane.on { display: block; }
+  .intro { color: var(--muted); font-size: 14px; margin: 16px 0 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px;
+          padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+  .chip:hover { border-color: var(--pulse); }
+  .log { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+  .msg { max-width: 100%; padding: 12px 14px; border-radius: 12px; background: var(--panel);
+         border: 1px solid var(--line); overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--user); color: var(--user-ink); border: 0; max-width: 85%; }
+  .msg.err { border-color: var(--warn); color: var(--warn); }
+  .msg.emergency { background: var(--warn-soft); border-color: var(--warn); }
+  .msg p { margin: 0 0 8px; } .msg p:last-child { margin-bottom: 0; }
+  .msg ul, .msg ol { margin: 4px 0 8px; padding-left: 20px; }
+  .msg a { color: var(--pulse); }
+  .cite { font-size: 11px; vertical-align: super; color: var(--pulse); font-weight: 600; }
+  .sources { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 13px; }
+  .sources div { margin: 3px 0; }
+  .sources .rv { color: var(--muted); margin-left: 6px; }
+  .trace { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .call { font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--chip);
+          border-radius: 6px; padding: 5px 8px; color: var(--muted); }
+  .call b { color: var(--ink); font-weight: 600; } .call.e { color: var(--warn); }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; color: var(--pulse);
+           background: var(--pulse-soft); border-radius: 4px; padding: 1px 6px; margin-bottom: 6px; }
+  .wait { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pulse); animation: p 1s infinite alternate; }
+  @keyframes p { from { opacity: .25 } to { opacity: 1 } }
+  form { position: fixed; left: 0; right: 0; bottom: 0; background: linear-gradient(transparent, var(--bg) 30%);
+         padding: 24px 16px 16px; }
+  .bar { max-width: 860px; margin: 0 auto; display: flex; gap: 8px; }
+  textarea { flex: 1; resize: none; font: inherit; padding: 12px; border-radius: 10px; min-width: 0;
+             border: 1px solid var(--line); background: var(--panel); color: var(--ink); height: 50px; }
+  textarea:focus { outline: 2px solid var(--pulse); outline-offset: -1px; }
+  button.send { border: 0; border-radius: 10px; padding: 0 18px; font: inherit; font-weight: 600;
+                background: var(--pulse); color: #fff; cursor: pointer; }
+  button.send:disabled { opacity: .5; cursor: default; }
+  .foot { text-align: center; color: var(--muted); font-size: 11px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>RxDx Bots</h1>
+  <p class="sub">Local demo · answers come from your Claude Code login · built from rxdx.in's public pages, not affiliated with RxDx · not medical advice</p>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-tab="qna">Ask RxDx<small>RAG · cited answers</small></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="nav">Care Navigator<small>Agent · finds doctors & days</small></button>
+  </div>
+</header>
+
+<main>
+  <section class="pane on" id="qna">
+    <p class="intro">Ask anything about RxDx: doctors, services, timings, contact details. Every claim links to the rxdx.in page it came from.</p>
+    <div class="chips">
+      <button class="chip">Is there a dermatologist in Whitefield on Mondays?</button>
+      <button class="chip">Do you do home sample collection? How much does it cost?</button>
+      <button class="chip">What is CIPRA.ai?</button>
+      <button class="chip">Which adult vaccines do you offer?</button>
+    </div>
+    <div class="log"></div>
+  </section>
+  <section class="pane" id="nav">
+    <p class="intro">Describe what you need and when you can come. The navigator searches the directory with tools, so every doctor, branch and day it names is real.</p>
+    <div class="chips">
+      <button class="chip">My 6 year old keeps getting ear infections. Saturdays only, Kannada-speaking if possible.</button>
+      <button class="chip">Knee pain after running, I'm near Malleswaram.</button>
+      <button class="chip">Can I see a psychiatrist online?</button>
+      <button class="chip">My father has chest pain, which cardiologist is in today?</button>
+    </div>
+    <div class="log"></div>
+  </section>
+</main>
+
+<form>
+  <div class="bar">
+    <textarea placeholder="Type a question…" aria-label="Message"></textarea>
+    <button class="send" type="submit">Send</button>
+  </div>
+  <div class="foot">Answers usually take 10–40 seconds · runs only on this computer</div>
+</form>
+
+<script>
+const sessions = { qna: crypto.randomUUID(), nav: crypto.randomUUID() };
+let tab = "qna", busy = false;
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Minimal, escape-first markdown: paragraphs, lists, **bold**, links, [n] citations.
+function md(text) {
+  const inline = s => esc(s)
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/\[(\d+)\]/g, '<span class="cite">[$1]</span>')
+    .replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  const out = []; let list = null;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    const m = line.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+    if (m) {
+      const kind = /^\d/.test(line) ? "ol" : "ul";
+      if (list !== kind) { if (list) out.push(`</${list}>`); out.push(`<${kind}>`); list = kind; }
+      out.push(`<li>${inline(m[1])}</li>`);
+      continue;
+    }
+    if (list) { out.push(`</${list}>`); list = null; }
+    if (line) out.push(`<p>${inline(line)}</p>`);
+  }
+  if (list) out.push(`</${list}>`);
+  return out.join("");
+}
+
+function add(cls, html) {
+  const el = document.createElement("div");
+  el.className = "msg " + cls; el.innerHTML = html;
+  $(`#${tab} .log`).appendChild(el);
+  el.scrollIntoView({ behavior: "smooth", block: "end" });
+  return el;
+}
+
+function render(kind, data) {
+  if (kind === "qna") {
+    let html = md(data.text);
+    if (data.sources?.length) {
+      html += '<div class="sources"><b>Sources</b>' + data.sources.map(s =>
+        `<div>[${s.n}] <a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>` +
+        (s.reviews ? `<span class="rv">· reviews: <a href="${esc(s.reviews.google)}" target="_blank" rel="noopener">Google</a> · <a href="${esc(s.reviews.practo)}" target="_blank" rel="noopener">Practo</a></span>` : "") +
+        `</div>`).join("") + "</div>";
+    }
+    return ["", html];
+  }
+  if (data.emergency) return ["emergency", `<span class="badge">Emergency screen · ${esc(data.emergency)}</span>` + md(data.text)];
+  const trace = data.tool_calls?.length ? '<div class="trace">' + data.tool_calls.map(c =>
+    `<div class="call ${c.error ? "e" : ""}">${c.error ? "✗" : "→"} <b>${esc(c.name)}</b>(${esc(Object.entries(c.args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", "))}) · ${esc(c.summary)}</div>`
+  ).join("") + "</div>" : "";
+  return ["", trace + md(data.text)];
+}
+
+async function send(text) {
+  text = text.trim();
+  if (!text || busy) return;
+  busy = true; $(".send").disabled = true; $("textarea").value = "";
+  const kind = tab;
+  add("user", esc(text));
+  const wait = add("", '<div class="wait"><span class="dot"></span>Thinking…</div>');
+  try {
+    const r = await fetch(`/api/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, session: sessions[kind] }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || r.statusText);
+    const [cls, html] = render(kind, data);
+    wait.className = "msg " + cls; wait.innerHTML = html;
+  } catch (e) {
+    wait.className = "msg err"; wait.textContent = "Something went wrong: " + e.message;
+  } finally {
+    busy = false; $(".send").disabled = false; $("textarea").focus();
+  }
+}
+
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
+  tab = b.dataset.tab;
+  document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === b));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === tab));
+});
+document.querySelectorAll(".chip").forEach(c => c.onclick = () => send(c.textContent));
+$("form").onsubmit = e => { e.preventDefault(); send($("textarea").value); };
+$("textarea").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(e.target.value); } };
+</script>
+</body>
+</html>
