@@ -94,6 +94,6 @@ The only credential is the Anthropic API key. It is read from the environment by
 
 ## Limitations
 
-- The knowledge base is a snapshot of rxdx.in from 2026-08-26 (`data/rxdx.json`). Schedules change, so the bot tells users to confirm before visiting.
+- The knowledge base is a snapshot of rxdx.in from 2026-08-26 (`../data/rxdx.json`, shared with the other projects). Schedules change, so the bot tells users to confirm before visiting.
 - The source has gaps: 12 doctors map to no branch, 25 have no published days, and clinic addresses and opening hours were not part of the scrape. The bot says it doesn't know rather than guessing.
 - Answer quality has only been tested offline: retrieval against the eval set, and generation plumbing against a stub. A graded answer eval run against the live API is the next step.

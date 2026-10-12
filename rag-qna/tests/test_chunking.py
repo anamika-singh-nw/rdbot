@@ -45,3 +45,11 @@ def test_missing_days_are_said_plainly():
 def test_titles_lose_site_suffixes():
     assert clean_title("Dermatology Archives - RxDx Clinics") == "Dermatology"
     assert clean_title("Home Visit &#038; Setup - RxDx Clinics") == "Home Visit & Setup"
+
+
+def test_mislabelled_profiles_use_the_url_name():
+    c = next(c for c in CHUNKS if c.id == "doctor:dr-diya-shah")
+    assert c.title == "Dr Diya Shah" and "Akhil Xavier Joseph" not in c.text
+    assert "confirm with the clinic" in c.text
+    titles = [c.title for c in CHUNKS if c.kind == "doctor"]
+    assert len(titles) == len(set(titles))  # "Dr Sireesh V" was on 11 pages

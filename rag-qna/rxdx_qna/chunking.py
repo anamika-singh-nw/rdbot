@@ -15,6 +15,7 @@ kind needs different handling:
 
 from __future__ import annotations
 
+import difflib
 import html
 import json
 import re
@@ -71,7 +72,35 @@ def _days(days: list[str]) -> str:
     return ", ".join(ordered) if ordered else ", ".join(days)
 
 
+def _letters(s: str) -> str:
+    return "".join(re.findall(r"[a-z]", re.sub(r"\b(dr|ms|mr|mrs|pt)\b", "", s.lower())))
+
+
+def name_from_slug(slug: str) -> str:
+    words = slug.split("-")
+    honorific = {"dr": "Dr", "ms": "Ms", "mr": "Mr", "mrs": "Mrs"}.get(words[0])
+    rest = [w.upper() if len(w) == 1 else w.capitalize() for w in (words[1:] if honorific else words)]
+    rest = ["(PT)" if w == "Pt" else w for w in rest]
+    return " ".join(([honorific] if honorific else []) + rest)
+
+
+def name_disagrees_with_url(name: str, slug: str) -> bool:
+    """19 scraped profiles carry another consultant's name, job title and overview — the
+    scraper took the wrong heading ("Dr Sireesh V" alone sits on 11 pages). The URL slug is
+    the reliable identity. Fuzzy, so spelling variants (Rajyalaxmi / Rajya Lakshmi) pass."""
+    if difflib.SequenceMatcher(None, _letters(name), _letters(slug.replace("-", " "))).ratio() >= 0.75:
+        return False
+    # SEO slugs add words ("…-pediatrician-malleshwaram") but still contain the whole name.
+    words = {w for w in re.findall(r"[a-z]+", name.lower()) if len(w) > 1} - {"dr", "ms", "mr", "mrs", "pt"}
+    return not (words and words <= set(slug.split("-")))
+
+
 def doctor_chunk(r: dict) -> Chunk:
+    if name_disagrees_with_url(r["name"], r["slug"]):
+        r = {**r, "name": name_from_slug(r["slug"]), "jobTitle": None, "overview": (
+            "Note: this profile on rxdx.in is inconsistent (it shows another consultant's name), "
+            "so only the department and schedule are given here. Please confirm with the clinic."
+        )}
     lines = [f"{r['name']} — {r.get('jobTitle') or 'Consultant'} at RxDx Clinics."]
     if r.get("department"):
         lines.append(f"Department / speciality: {r['department']}.")

@@ -1,0 +1,172 @@
+"""The care-navigator agent: a hand-written tool-use loop around Claude.
+
+A manual loop rather than the SDK's beta tool runner, because the loop is the product:
+- it caps the number of model calls per turn, so a confused run cannot spin forever;
+- it records every tool call as a trace, which is what the scenario eval grades;
+- it is testable offline against a scripted stub client.
+
+The API key is read from the environment by the SDK (ANTHROPIC_API_KEY or an
+`ant auth login` profile). It is never passed in code, logged, or written to disk.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+
+import anthropic
+
+from .safety import screen
+from .tools import TOOLS, Toolbox, ToolError
+
+MODEL = "claude-opus-5-5"
+FALLBACK_BETA = "server-side-fallback-2026-07-01"
+MAX_STEPS = 8
+
+SYSTEM = """You are the RxDx Care Navigator. RxDx Clinics is a multispeciality outpatient \
+network in Bengaluru. You help patients and families get from "here is my problem and my \
+constraints" to "this doctor, at this branch, on this day" — and, when they are ready, a \
+booking request they can send.
+
+How to work:
+- Use the tools for every fact about doctors, branches and days. Never name a doctor, branch \
+or day that did not come back from a tool in this conversation.
+- Work out the constraints that matter: the concern, area/branch, days they can come, \
+in-clinic or teleconsultation, language, a child or an adult. Ask one short question only \
+when a missing detail would change the recommendation; otherwise search with what you have.
+- Map the concern to a speciality yourself (ear infections in a child → Paediatric ENT or \
+Paediatrics; knee pain from running → Orthopaedics or Sports Medicine). If unsure of the exact \
+name, call list_specialities. If a search finds nothing, relax one constraint at a time and \
+say which one you relaxed.
+- Recommend two or three doctors at most, with the branch and days for each, and say why \
+they fit. Prefer doctors with published days. If a result carries a warning, pass it on.
+- Only call prepare_booking_request once the patient has picked a doctor, branch, day and \
+mode. Make clear it is a request RxDx will confirm, not a booking.
+
+Boundaries:
+- You are not a clinician. Do not diagnose, interpret test results, or suggest treatment or \
+medication. Saying which speciality usually handles a concern is fine.
+- If anything suggests an emergency, tell them to call 108 or go to the nearest emergency \
+department first; RxDx clinics are outpatient clinics.
+- Schedules on the website can change; suggest confirming with RxDx (+91 901 409 1111) \
+before travelling.
+
+Be brief and concrete. Plain sentences, short lists where they help."""
+
+
+@dataclass
+class ToolCall:
+    name: str
+    input: dict
+    output: str
+    is_error: bool
+
+
+@dataclass
+class Turn:
+    text: str
+    tool_calls: list[ToolCall] = field(default_factory=list)
+    stop_reason: str | None = None
+    emergency: str | None = None
+    steps: int = 0
+    usage: dict = field(default_factory=lambda: {"input": 0, "output": 0, "cache_read": 0})
+
+
+class Navigator:
+    """One conversation. `messages` is append-only: assistant turns are stored exactly as
+    returned (thinking blocks included), and tool results are appended, never edited."""
+
+    def __init__(self, toolbox: Toolbox | None = None, client=None, effort: str = "medium"):
+        self.toolbox = toolbox or Toolbox()
+        self.client = client or anthropic.Anthropic()
+        self.effort = effort
+        self.messages: list[dict] = []
+
+    def _call(self):
+        return self.client.beta.messages.create(
+            model=MODEL,
+            max_tokens=16000,
+            system=SYSTEM,
+            tools=TOOLS,
+            messages=self.messages,
+            output_config={"effort": self.effort},
+            cache_control={"type": "ephemeral"},
+            betas=[FALLBACK_BETA],
+            extra_body={"fallbacks": "default"},
+        )
+
+    def _execute(self, block) -> ToolCall:
+        try:
+            out = self.toolbox.run(block.name, dict(block.input))
+            return ToolCall(block.name, dict(block.input), out, False)
+        except ToolError as e:
+            return ToolCall(block.name, dict(block.input), str(e), True)
+        except TypeError as e:  # arguments that don't fit the function — report, don't crash
+            return ToolCall(block.name, dict(block.input), f"Bad arguments: {e}", True)
+
+    def ask(self, message: str) -> Turn:
+        hit = screen(message)
+        if hit:
+            category, reply = hit
+            # Recorded in history so later turns know it was said, but no model call is made.
+            self.messages.append({"role": "user", "content": message})
+            self.messages.append({"role": "assistant", "content": reply})
+            return Turn(reply, emergency=category, stop_reason="emergency_screen")
+
+        self.messages.append({"role": "user", "content": message})
+        turn = Turn(text="")
+        for step in range(1, MAX_STEPS + 1):
+            resp = self._call()
+            turn.steps = step
+            turn.stop_reason = resp.stop_reason
+            for k, attr in (("input", "input_tokens"), ("output", "output_tokens"), ("cache_read", "cache_read_input_tokens")):
+                turn.usage[k] += getattr(resp.usage, attr, 0) or 0
+            self.messages.append({"role": "assistant", "content": resp.content})
+
+            if resp.stop_reason == "refusal":
+                turn.text = "I can't help with that here. Please call RxDx on +91 901 409 1111."
+                return turn
+            uses = [b for b in resp.content if b.type == "tool_use"]
+            if resp.stop_reason != "tool_use" or not uses:
+                turn.text = "".join(b.text for b in resp.content if b.type == "text").strip()
+                if resp.stop_reason == "max_tokens":
+                    turn.text += "\n\n(Answer cut short — please ask again more narrowly.)"
+                return turn
+
+            calls = [self._execute(b) for b in uses]
+            turn.tool_calls.extend(calls)
+            # All results in one user message — splitting them discourages parallel calls.
+            self.messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": b.id, "content": c.output, "is_error": c.is_error}
+                    for b, c in zip(uses, calls)
+                ],
+            })
+
+        turn.text = (
+            "I couldn't finish working that out. Please call RxDx on +91 901 409 1111, "
+            "or try asking with one constraint at a time."
+        )
+        turn.stop_reason = "max_steps"
+        return turn
+
+
+def trace(turn: Turn) -> str:
+    lines = []
+    for c in turn.tool_calls:
+        args = ", ".join(f"{k}={v!r}" for k, v in c.input.items() if v is not None)
+        summary = c.output if c.is_error else _brief(c.name, c.output)
+        lines.append(f"  {'✗' if c.is_error else '→'} {c.name}({args})  {summary}")
+    return "\n".join(lines)
+
+
+def _brief(name: str, output: str) -> str:
+    data = json.loads(output)
+    if name == "find_doctors":
+        return f"{data['total_matches']} match(es)"
+    if name == "get_doctor":
+        return data["name"]
+    if name == "prepare_booking_request":
+        return "draft ready"
+    return f"{len(next(iter(data.values())))} item(s)"

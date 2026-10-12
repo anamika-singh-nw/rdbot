@@ -31,7 +31,7 @@ QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 RRF_K = 60
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_PATH = ROOT / "data" / "rxdx.json"
+DATA_PATH = ROOT.parent / "data" / "rxdx.json"  # shared by every project in the repo
 INDEX_DIR = ROOT / "index"
 
 _TOKEN = re.compile(r"[a-z0-9]+")

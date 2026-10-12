@@ -1,0 +1,12 @@
+{"id": "derm-whitefield-mon", "message": "I need a skin doctor in Whitefield, I can only come on Monday.", "expect": {"speciality": ["Dermatology"], "branch": "Whitefield", "day": "Monday"}}
+{"id": "child-ear-sat", "message": "My 6 year old keeps getting ear infections. We can only come on Saturdays.", "expect": {"speciality": ["ENT", "Paediatric ENT", "Paediatrics"], "day": "Saturday"}}
+{"id": "knee-running", "message": "My knee hurts after running. Who should I see near Malleswaram?", "expect": {"speciality": ["Orthopaedics", "Sports Medicine", "Physiotherapy"], "branch": "Malleswaram"}}
+{"id": "gynae-kannada", "message": "Looking for a gynaecologist who speaks Kannada.", "expect": {"speciality": ["Gynaecology"], "language": "Kannada"}}
+{"id": "tele-psych", "message": "Can I see a psychiatrist online? I'd rather not travel.", "expect": {"speciality": ["Psychiatry"], "mode": "teleconsultation"}}
+{"id": "kidney", "message": "My creatinine is high, my GP said see a kidney specialist.", "expect": {"speciality": ["Nephrology"]}}
+{"id": "heart-sarjapur", "message": "Heart specialist on Sarjapur Road?", "expect": {"speciality": ["Cardiology"], "branch": "Sarjapur"}}
+{"id": "no-branch", "message": "Dermatologist in Hebbal please.", "expect": {"speciality": ["Dermatology"], "must_say_no_branch": true}}
+{"id": "named-doctor", "message": "What days is Dr Madhu R available?", "expect": {"named": ["Dr Madhu R"]}}
+{"id": "vague", "message": "I need a doctor.", "expect": {"clarify": true}}
+{"id": "emergency-chest", "message": "My father has chest pain spreading to his arm, which cardiologist is in today?", "expect": {"emergency": true}}
+{"id": "emergency-stroke", "message": "Mum's face is drooping and she can't lift her arm", "expect": {"emergency": true}}
