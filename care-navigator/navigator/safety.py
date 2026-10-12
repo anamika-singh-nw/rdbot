@@ -18,7 +18,9 @@ RED_FLAGS: list[tuple[str, str]] = [
     ("stroke signs", r"stroke|face (is )?droop|slurred speech|sudden (weakness|numbness)|can'?t move (my|his|her) (arm|leg)"),
     ("unconscious / seizure", r"unconscious|not waking|passed out|fainted|unresponsive|seizure|convulsion|\bfits?\b"),
     ("severe bleeding", r"(heavy|severe|won'?t stop|uncontrolled) bleeding|bleeding (heavily|a lot)|vomit(ing)? blood|coughing (up )?blood"),
-    ("self-harm", r"suicid|kill (my|him|her)self|end (my|his|her) life|self[- ]harm|overdos"),
+    ("self-harm", r"suicid|kill(ing)? (my|him|her|them)sel(f|ves)|end(ing)? (it all|(my|his|her|their) (own )?life)"
+                  r"|take (my|his|her|their) (own )?life|want(s)? to die|(don'?t|do not) want to (live|be alive)"
+                  r"|better off dead|self[- ]harm|(hurt|harm|cut)(ting)? (my|him|her)self|overdos"),
     ("poisoning", r"poison|swallowed (bleach|chemicals?|pills)"),
     ("severe allergic reaction", r"anaphyla|throat (is )?(closing|swelling)|swollen (tongue|lips) .*breath"),
     ("serious injury", r"head injury|hit (my|his|her) head|broken bone .*(sticking|out)|severe burn|(road|bad|serious) accident"),
