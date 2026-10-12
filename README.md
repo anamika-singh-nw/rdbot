@@ -26,3 +26,11 @@ rag-qna/.venv/bin/python demo/server.py     # after setting up rag-qna (see its 
 One page with a tab for each bot. Answers come through your logged-in `claude` CLI, so no
 API key is needed. The server only listens on this computer and runs on your Claude
 subscription, so it's for demos, not for sharing.
+
+## Hosted version
+
+`app.py` serves the same page on Vercel, answered through the Anthropic API. The key is set
+only in Vercel's environment variables (`ANTHROPIC_API_KEY`), never in the repository. Each
+visitor is limited to 15 questions an hour (`RATE_PER_HOUR`); the hard cost ceiling is the
+monthly spend limit on the key in the Anthropic Console. The search index (`rag-qna/index/`)
+is committed so the server doesn't rebuild it; a test fails if it goes stale.

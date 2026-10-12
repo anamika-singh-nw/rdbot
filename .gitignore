@@ -4,8 +4,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Built artefacts (rebuild with `python -m rxdx_qna build`)
-index/
+# The search index (rag-qna/index/) IS committed — the hosted app needs it and it's ~1.3 MB.
+# Rebuild with `python -m rxdx_qna build`; tests/test_index_fresh.py fails if it goes stale.
 
 # Credentials — never commit
 .env
