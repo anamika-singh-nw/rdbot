@@ -67,8 +67,17 @@ def index():
 
 
 @app.get("/health")
-def health():
-    return {"ok": True, "api_key_configured": core.api_configured()}
+def health(deep: bool = False):
+    out = {"ok": True, "api_key_configured": core.api_configured()}
+    if deep:  # exercises retrieval and the tools without calling the model (no cost)
+        t = time.time()
+        out["retrieval_top"] = core.retriever().search("dermatologist in Whitefield", k=1)[0].chunk.id
+        out["tool_ok"] = '"total_matches"' in core.toolbox().run(
+            "find_doctors",
+            {"speciality": "ENT", "branch": None, "day": "Saturday", "mode": "any", "language": None, "name": None},
+        )
+        out["seconds"] = round(time.time() - t, 2)
+    return out
 
 
 async def _handle(kind: str, request: Request):
