@@ -62,3 +62,15 @@ def test_booking_validates_availability():
 def test_unknown_tool_is_an_error():
     with pytest.raises(ToolError):
         T.run("delete_everything", {})
+
+
+def test_every_doctor_result_has_review_search_links_not_ratings():
+    from urllib.parse import unquote
+    for d in find(speciality="Dermatology")["doctors"]:
+        links = d["review_search_links"]
+        assert set(links) == {"google", "practo"}
+        assert all(u.startswith("https://www.google.com/search?q=") for u in links.values())
+        assert "site:practo.com" in unquote(links["practo"])
+        assert not any(k in d for k in ("rating", "stars", "review_count"))
+    madhu = json.loads(T.run("get_doctor", {"slug": "dr-madhu-r"}))
+    assert unquote(madhu["review_search_links"]["google"]).endswith('"Madhu R" RxDx Bengaluru reviews')

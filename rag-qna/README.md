@@ -14,6 +14,10 @@ Sources:
   [2] Contact RxDx Clinics — https://rxdx.in/contact-us/
 ```
 
+Each doctor cited as a source also gets review links: a Google search and a Practo search for
+that doctor. They are searches, not ratings. No rating is fetched or shown, because matching
+ratings by name alone is unreliable.
+
 *(Illustrative output. The facts shown are the ones in the knowledge base.)*
 
 > Independent project built from rxdx.in's public pages. It is not affiliated with RxDx, and it does not
@@ -79,7 +83,7 @@ python -m rxdx_qna chat -v         # multi-turn; -v shows retrieved chunks and t
 ## Tests and evals
 
 ```bash
-python -m pytest                   # 17 tests, offline, no API key
+python -m pytest                   # 19 tests, offline, no API key
 python eval/run_retrieval.py --misses
 ```
 

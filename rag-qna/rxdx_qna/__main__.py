@@ -20,6 +20,9 @@ def _print_answer(ans, verbose: bool) -> None:
         print("\nSources:")
         for s in ans.sources:
             print(f"  [{s.n}] {s.title} — {s.url}")
+            if s.reviews:
+                print(f"      reviews: Google {s.reviews['google']}")
+                print(f"               Practo {s.reviews['practo']}")
     if verbose:
         print("\nRetrieved:")
         for h in ans.hits:

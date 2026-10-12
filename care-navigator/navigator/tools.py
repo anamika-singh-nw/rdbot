@@ -12,6 +12,7 @@ properties, so "not specified" is an explicit null.
 from __future__ import annotations
 
 import json
+import re
 from urllib.parse import quote
 
 from .directory import DAYS, Directory, Doctor, Sitting
@@ -93,6 +94,22 @@ TOOLS = [
 ]
 
 
+def review_links(name: str) -> dict[str, str]:
+    """Search links for a doctor's public reviews — searches, not ratings.
+
+    No rating is fetched or shown: matching a rating to a doctor by name is unreliable
+    (namesakes, initials), and a wrong rating on a doctor misleads patients. The quoted
+    name plus "RxDx"/"Bengaluru" narrows the search; the patient judges the results.
+    Practo is reached through a site-restricted Google search because its own search URLs
+    are not stable.
+    """
+    bare = re.sub(r"^(Dr|Ms|Mr|Mrs)\.?\s+", "", name).replace("(PT)", "").strip()
+    return {
+        "google": "https://www.google.com/search?q=" + quote(f'"{bare}" RxDx Bengaluru reviews'),
+        "practo": "https://www.google.com/search?q=" + quote(f'site:practo.com "{bare}" Bangalore'),
+    }
+
+
 class ToolError(Exception):
     """Returned to the model as an `is_error` tool result so it can correct course."""
 
@@ -129,6 +146,7 @@ class Toolbox:
             "languages": doc.languages,
             "availability": [self._sitting(s) for s in sittings],
             "profile_url": doc.url,
+            "review_search_links": review_links(doc.name),
         }
         if doc.needs_verification:
             out["warning"] = (

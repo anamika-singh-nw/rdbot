@@ -86,3 +86,11 @@ def test_refusal_is_not_rendered_as_an_answer():
     bot = make_bot(reply(text="", stop="refusal"), {})
     ans = bot.ask("something")
     assert ans.stop_reason == "refusal" and "901 409 1111" in ans.text and ans.sources == []
+
+
+def test_doctor_sources_get_review_links_pages_do_not():
+    content = [NS(type="text", text="See Dr A or the pharmacy.", citations=[cite("Dr A"), cite("Pharmacy")])]
+    _, sources = _render(content, HITS)
+    doctor, page = sources
+    assert set(doctor.reviews) == {"google", "practo"} and '%22A%22' in doctor.reviews["google"]
+    assert page.reviews is None

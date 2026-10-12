@@ -11,7 +11,9 @@ The API key is read from the environment by the SDK (ANTHROPIC_API_KEY, or an
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+from urllib.parse import quote
 
 import anthropic
 
@@ -40,11 +42,28 @@ needs to act on it (which doctor, which clinic, which days). Schedules on the we
 change, so suggest confirming before visiting."""
 
 
+def review_links(name: str) -> dict[str, str]:
+    """Search links for a doctor's public reviews — searches, not ratings.
+
+    No rating is fetched or shown: matching a rating to a doctor by name is unreliable
+    (namesakes, initials), and a wrong rating on a doctor misleads patients. The quoted
+    name plus "RxDx"/"Bengaluru" narrows the search; the patient judges the results.
+    Practo is reached through a site-restricted Google search because its own search URLs
+    are not stable.
+    """
+    bare = re.sub(r"^(Dr|Ms|Mr|Mrs)\.?\s+", "", name).replace("(PT)", "").strip()
+    return {
+        "google": "https://www.google.com/search?q=" + quote(f'"{bare}" RxDx Bengaluru reviews'),
+        "practo": "https://www.google.com/search?q=" + quote(f'site:practo.com "{bare}" Bangalore'),
+    }
+
+
 @dataclass
 class Source:
     n: int
     title: str
     url: str
+    reviews: dict[str, str] | None = None  # doctors only
 
 
 @dataclass
@@ -85,7 +104,8 @@ def _render(content, hits: list[Hit]) -> tuple[str, list[Source]]:
             if chunk is None:
                 continue
             if chunk.url not in sources:
-                sources[chunk.url] = Source(len(sources) + 1, chunk.title, chunk.url)
+                reviews = review_links(chunk.title) if chunk.kind == "doctor" else None
+                sources[chunk.url] = Source(len(sources) + 1, chunk.title, chunk.url, reviews)
             if sources[chunk.url].n not in marks:
                 marks.append(sources[chunk.url].n)
         if marks:

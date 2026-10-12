@@ -32,6 +32,8 @@ Deterministic tools handle every fact:
 | --- | --- |
 | `find_doctors` | filter by speciality, branch, day, in-clinic or tele, language and name; returns real availability |
 | `get_doctor` | full profile: qualifications, experience, overview |
+
+Every doctor result also carries `review_search_links`: a Google search and a Practo search for that doctor. These are searches, **not ratings**. Matching a star rating to a doctor by name alone is unreliable (namesakes, initials), and a wrong rating on a doctor would mislead patients, so the agent is told never to state a rating itself.
 | `list_specialities` / `list_branches` | the valid vocabulary, used when the model is unsure |
 | `prepare_booking_request` | a WhatsApp-ready **draft**; it fails if the doctor isn't at that branch on that day |
 
@@ -71,7 +73,7 @@ python -m navigator chat -v          # -v prints every tool call
 ## Tests and evals
 
 ```bash
-python -m pytest                     # 42 tests, offline, no API key
+python -m pytest                     # 50 tests, offline, no API key
 python eval/run_scenarios.py         # 12 live scenarios — calls the API, costs money
 ```
 
