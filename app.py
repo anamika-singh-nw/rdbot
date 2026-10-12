@@ -19,6 +19,12 @@ import threading
 import time
 from collections import defaultdict, deque
 
+# Vercel's filesystem is read-only except /tmp. The embedding model is downloaded from
+# Hugging Face on first use, and both the hub client and fastembed default to caches under
+# $HOME — so point them at /tmp before anything imports them.
+os.environ.setdefault("HF_HOME", "/tmp/hf")
+os.environ.setdefault("FASTEMBED_CACHE_PATH", "/tmp/fastembed")
+
 import anthropic
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
