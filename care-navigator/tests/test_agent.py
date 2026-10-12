@@ -102,3 +102,34 @@ def test_refusal_is_handled():
     nav = Navigator(client=Script(resp([], "refusal")))
     turn = nav.ask("something")
     assert turn.stop_reason == "refusal" and "901 409 1111" in turn.text
+
+
+def test_cli_navigator_runs_tool_calls_then_answers():
+    import json as _json
+
+    from navigator.agent import CLI_SCHEMA, CliNavigator
+
+    steps = [
+        {"tool_calls": [{"name": "find_doctors", "arguments": _json.dumps(FIND)}], "reply": ""},
+        {"tool_calls": [{"name": "get_doctor", "arguments": "not json"}], "reply": ""},
+        {"tool_calls": [], "reply": "Dr Madhu R, Whitefield, Monday."},
+    ]
+    prompts = []
+
+    def fake_ask(prompt, system, schema, effort):
+        assert schema is CLI_SCHEMA and "find_doctors" in system
+        prompts.append(prompt)
+        return steps.pop(0)
+
+    nav = CliNavigator(ask=fake_ask)
+    turn = nav.ask("skin doctor in Whitefield on Monday")
+    assert turn.text == "Dr Madhu R, Whitefield, Monday." and turn.steps == 3
+    assert [c.is_error for c in turn.tool_calls] == [False, True]
+    assert "dr-madhu-r" in prompts[1] and "not valid JSON" in prompts[2]
+
+
+def test_cli_navigator_emergency_skips_the_cli():
+    from navigator.agent import CliNavigator
+
+    nav = CliNavigator(ask=lambda *a, **k: (_ for _ in ()).throw(AssertionError("called")))
+    assert nav.ask("she can't breathe").emergency == "breathing"

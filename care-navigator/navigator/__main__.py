@@ -3,6 +3,7 @@
     python -m navigator tool find_doctors '{"speciality": "ENT", "day": "Saturday"}'   # no API key needed
     python -m navigator ask "My son has ear pain, we're near Whitefield, Saturdays only"
     python -m navigator chat -v      # -v prints each tool call the agent makes
+    python -m navigator chat -v --backend cli   # use the logged-in `claude` CLI, no API key
 """
 
 from __future__ import annotations
@@ -22,9 +23,13 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("args", nargs="?", default="{}", help="JSON arguments; omitted filters default to null")
     a = sub.add_parser("ask", help="one request")
     a.add_argument("message")
-    a.add_argument("-v", "--verbose", action="store_true")
     c = sub.add_parser("chat", help="interactive conversation")
-    c.add_argument("-v", "--verbose", action="store_true")
+    for sp in (a, c):
+        sp.add_argument("-v", "--verbose", action="store_true")
+        sp.add_argument(
+            "--backend", choices=["api", "cli"], default="api",
+            help="api: Anthropic API key (default). cli: your logged-in `claude` CLI, for local demos.",
+        )
     args = p.parse_args(argv)
 
     if args.cmd == "tool":
@@ -38,9 +43,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
-    from .agent import Navigator, trace  # deferred: `tool` must work without the SDK configured
+    from .agent import CliNavigator, Navigator, trace  # deferred: `tool` must work without the SDK configured
 
-    nav = Navigator()
+    nav = CliNavigator() if args.backend == "cli" else Navigator()
 
     def show(turn):
         if args.verbose and turn.tool_calls:

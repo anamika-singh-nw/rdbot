@@ -173,3 +173,103 @@ def _brief(name: str, output: str) -> str:
     if name == "prepare_booking_request":
         return "draft ready"
     return f"{len(next(iter(data.values())))} item(s)"
+
+
+CLI_PROTOCOL = """
+
+Tools are called through structured output. Each reply is a JSON object:
+- To call tools: put one or more calls in "tool_calls" (each with "name" and "arguments" as a \
+JSON-encoded string matching that tool's input schema, every property present, null where \
+unspecified) and leave "reply" empty. You will get the results and be asked again.
+- To answer the patient: leave "tool_calls" empty and write the answer in "reply".
+
+Available tools:
+{tools}"""
+
+CLI_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "tool_calls": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "enum": [t["name"] for t in TOOLS]},
+                    "arguments": {"type": "string"},
+                },
+                "required": ["name", "arguments"],
+                "additionalProperties": False,
+            },
+        },
+        "reply": {"type": "string"},
+    },
+    "required": ["tool_calls", "reply"],
+    "additionalProperties": False,
+}
+
+
+class CliNavigator:
+    """The same agent driven through the local `claude` CLI (no API key), for local demos.
+
+    The CLI has no client-side tool calls, so each step asks for structured output — tool
+    calls or a final reply — and this loop runs the tools and feeds results back. Same tools,
+    same emergency screen, same step cap as `Navigator`."""
+
+    def __init__(self, toolbox: Toolbox | None = None, effort: str = "medium", ask=None):
+        from . import claude_cli
+
+        self.toolbox = toolbox or Toolbox()
+        self.effort = effort
+        self._ask = ask or claude_cli.ask
+        tools = json.dumps(
+            [{k: t[k] for k in ("name", "description", "input_schema")} for t in TOOLS], indent=1
+        )
+        self.system = SYSTEM + CLI_PROTOCOL.format(tools=tools)
+        self.transcript: list[str] = []
+
+    def ask(self, message: str) -> Turn:
+        hit = screen(message)
+        if hit:
+            category, reply = hit
+            self.transcript += [f"PATIENT: {message}", f"YOU: {reply}"]
+            return Turn(reply, emergency=category, stop_reason="emergency_screen")
+
+        self.transcript.append(f"PATIENT: {message}")
+        turn = Turn(text="")
+        for step in range(1, MAX_STEPS + 1):
+            turn.steps = step
+            out = self._ask("\n\n".join(self.transcript), self.system, schema=CLI_SCHEMA, effort=self.effort)
+            calls = out.get("tool_calls") or []
+            if not calls:
+                turn.text = (out.get("reply") or "").strip()
+                turn.stop_reason = "end_turn"
+                self.transcript.append(f"YOU: {turn.text}")
+                return turn
+            results = []
+            for c in calls:
+                try:
+                    args = json.loads(c["arguments"] or "{}")
+                    call = self._execute(c["name"], args)
+                except json.JSONDecodeError as e:
+                    call = ToolCall(c["name"], {}, f"Arguments were not valid JSON: {e}", True)
+                turn.tool_calls.append(call)
+                results.append(
+                    f"TOOL {call.name}({json.dumps(call.input, ensure_ascii=False)}) → "
+                    f"{'ERROR: ' if call.is_error else ''}{call.output}"
+                )
+            self.transcript.append("\n".join(results))
+
+        turn.text = (
+            "I couldn't finish working that out. Please call RxDx on +91 901 409 1111, "
+            "or try asking with one constraint at a time."
+        )
+        turn.stop_reason = "max_steps"
+        return turn
+
+    def _execute(self, name: str, args: dict) -> ToolCall:
+        try:
+            return ToolCall(name, args, self.toolbox.run(name, args), False)
+        except ToolError as e:
+            return ToolCall(name, args, str(e), True)
+        except TypeError as e:
+            return ToolCall(name, args, f"Bad arguments: {e}", True)

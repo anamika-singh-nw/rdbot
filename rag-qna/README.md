@@ -80,10 +80,12 @@ python -m rxdx_qna ask "Do you do home sample collection?"
 python -m rxdx_qna chat -v         # multi-turn; -v shows retrieved chunks and token usage
 ```
 
+**No API key? Use your Claude Code login instead.** Add `--backend cli` to `ask` or `chat` and the bot calls the local `claude` CLI in headless mode. That CLI is locked down: no tools, none of your MCP connectors, no skills and no local settings. It runs on your Claude subscription, so use it only for local demos. Anything other people use should run on the API.
+
 ## Tests and evals
 
 ```bash
-python -m pytest                   # 19 tests, offline, no API key
+python -m pytest                   # 21 tests, offline, no API key
 python eval/run_retrieval.py --misses
 ```
 
@@ -100,4 +102,4 @@ The only credential is the Anthropic API key. It is read from the environment by
 
 - The knowledge base is a snapshot of rxdx.in from 2026-08-26 (`../data/rxdx.json`, shared with the other projects). Schedules change, so the bot tells users to confirm before visiting.
 - The source has gaps: 12 doctors map to no branch, 25 have no published days, and clinic addresses and opening hours were not part of the scrape. The bot says it doesn't know rather than guessing.
-- Answer quality has only been tested offline: retrieval against the eval set, and generation plumbing against a stub. A graded answer eval run against the live API is the next step.
+- Answers have been checked by hand through the CLI backend (spot-checked against the source pages); no graded answer eval exists yet. With the CLI backend, citations are passage numbers that the code validates, not the API's native citations.

@@ -159,3 +159,66 @@ class QnABot:
             "cache_read": getattr(msg.usage, "cache_read_input_tokens", 0) or 0,
         }
         return Answer(text, sources, hits, msg.stop_reason, msg.model, usage)
+
+
+CLI_CITATION_RULE = """
+
+The documents arrive as numbered passages. After each sentence that uses a passage, cite it \
+with its number in square brackets, e.g. [2] or [1][3]. Cite only passage numbers that exist."""
+
+
+def _render_numbered(text: str, hits: list[Hit]) -> tuple[str, list[Source]]:
+    """Map the model's [n] passage markers to sources numbered by distinct page. Markers that
+    name no supplied passage are dropped rather than shown as citations."""
+    sources: dict[str, Source] = {}
+
+    def repl(m: re.Match) -> str:
+        i = int(m.group(1)) - 1
+        if not 0 <= i < len(hits):
+            return ""
+        chunk = hits[i].chunk
+        if chunk.url not in sources:
+            reviews = review_links(chunk.title) if chunk.kind == "doctor" else None
+            sources[chunk.url] = Source(len(sources) + 1, chunk.title, chunk.url, reviews)
+        return f"[{sources[chunk.url].n}]"
+
+    out = re.sub(r"\[(\d+)\]", repl, text)
+    out = re.sub(r"(\[\d+\])\1+", r"\1", out)  # [1][1] → [1]
+    return out.strip(), list(sources.values())
+
+
+class CliQnABot:
+    """Same retrieval and rules, answered through the local `claude` CLI (no API key).
+
+    Citations are not API-native here: passages are numbered in the prompt and the model
+    cites them as [n]; markers are validated against the passages actually supplied."""
+
+    HISTORY_TURNS = 3
+
+    def __init__(self, retriever: Retriever | None = None, k: int = 8, effort: str = "medium"):
+        from . import claude_cli
+
+        self.cli = claude_cli
+        self.retriever = retriever or Retriever()
+        self.k = k
+        self.effort = effort
+        self.history: list[tuple[str, str]] = []
+        self._last_question: str | None = None
+
+    def ask(self, question: str) -> Answer:
+        query = f"{self._last_question} {question}" if self._last_question else question
+        hits = self.retriever.search(query, k=self.k)
+        self._last_question = question
+
+        passages = "\n\n".join(
+            f"[{i}] {h.chunk.title} ({h.chunk.url})\n{h.chunk.text}" for i, h in enumerate(hits, 1)
+        )
+        earlier = "\n".join(f"Patient: {q}\nAssistant: {a}" for q, a in self.history[-self.HISTORY_TURNS:])
+        prompt = (
+            (f"Conversation so far:\n{earlier}\n\n" if earlier else "")
+            + f"Passages:\n\n{passages}\n\nQuestion: {question}"
+        )
+        reply = self.cli.ask(prompt, SYSTEM + CLI_CITATION_RULE, effort=self.effort)
+        text, sources = _render_numbered(reply, hits)
+        self.history.append((question, re.sub(r"\[\d+\]", "", text)))
+        return Answer(text, sources, hits, "end_turn", MODEL + " (claude CLI)")

@@ -4,6 +4,7 @@
     python -m rxdx_qna search "skin doctor"      # retrieval only — no API key needed
     python -m rxdx_qna ask "Who is a paediatrician in Malleshwaram?"
     python -m rxdx_qna chat                      # multi-turn
+    python -m rxdx_qna chat --backend cli        # use the logged-in `claude` CLI, no API key
 """
 
 from __future__ import annotations
@@ -39,9 +40,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("-k", type=int, default=8)
     a = sub.add_parser("ask", help="answer one question")
     a.add_argument("question")
-    a.add_argument("-v", "--verbose", action="store_true")
     c = sub.add_parser("chat", help="interactive multi-turn chat")
-    c.add_argument("-v", "--verbose", action="store_true")
+    for sp in (a, c):
+        sp.add_argument("-v", "--verbose", action="store_true")
+        sp.add_argument(
+            "--backend", choices=["api", "cli"], default="api",
+            help="api: Anthropic API key (default). cli: your logged-in `claude` CLI, for local demos.",
+        )
     args = p.parse_args(argv)
 
     if args.cmd == "build":
@@ -54,9 +59,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{h.score:.4f}  {h.chunk.id:45}  {h.chunk.text[:90].replace(chr(10), ' ')}")
         return 0
 
-    from .answer import QnABot  # deferred: `search` must work without the SDK configured
+    from .answer import CliQnABot, QnABot  # deferred: `search` must work without the SDK configured
 
-    bot = QnABot(retriever)
+    bot = CliQnABot(retriever) if args.backend == "cli" else QnABot(retriever)
     if args.cmd == "ask":
         _print_answer(bot.ask(args.question), args.verbose)
         return 0

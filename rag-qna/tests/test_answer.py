@@ -94,3 +94,28 @@ def test_doctor_sources_get_review_links_pages_do_not():
     doctor, page = sources
     assert set(doctor.reviews) == {"google", "practo"} and '%22A%22' in doctor.reviews["google"]
     assert page.reviews is None
+
+
+def test_cli_markers_map_to_sources_and_bogus_ones_are_dropped():
+    from rxdx_qna.answer import _render_numbered
+
+    text, sources = _render_numbered("Dr A is in Monday [1][1]. Medicines are delivered [2]. Also [9].", HITS)
+    assert text == "Dr A is in Monday [1]. Medicines are delivered [2]. Also ."
+    assert [(s.n, s.url) for s in sources] == [(1, A.url), (2, B.url)]
+    assert sources[0].reviews and sources[1].reviews is None
+
+
+def test_cli_bot_sends_numbered_passages_and_keeps_history():
+    from rxdx_qna.answer import CliQnABot
+
+    seen = []
+    bot = CliQnABot.__new__(CliQnABot)
+    bot.retriever = NS(search=lambda q, k: HITS)
+    bot.k, bot.effort, bot.history, bot._last_question = 8, "medium", [], None
+    bot.cli = NS(ask=lambda prompt, system, effort: seen.append((prompt, system)) or "Monday [1].")
+    bot.ask("When is Dr A in?")
+    ans = bot.ask("Anything else?")
+    prompt, system = seen[-1]
+    assert "[1] Dr A (https://rxdx.in/consultants/a/)" in prompt and "[2] Pharmacy" in prompt
+    assert "Patient: When is Dr A in?" in prompt and "square brackets" in system
+    assert ans.text == "Monday [1]." and ans.sources[0].url == A.url

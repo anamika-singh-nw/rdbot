@@ -70,10 +70,12 @@ export ANTHROPIC_API_KEY=...
 python -m navigator chat -v          # -v prints every tool call
 ```
 
+**No API key? Use your Claude Code login instead.** Add `--backend cli` to `ask` or `chat` and the agent calls the local `claude` CLI in headless mode. That CLI is locked down: no tools, none of your MCP connectors, no skills and no local settings. It runs on your Claude subscription, so use it only for local demos. Anything other people use should run on the API. Over the CLI, each step returns structured JSON (tool calls or a reply), and the same loop runs the same tools.
+
 ## Tests and evals
 
 ```bash
-python -m pytest                     # 50 tests, offline, no API key
+python -m pytest                     # 52 tests, offline, no API key
 python eval/run_scenarios.py         # 12 live scenarios — calls the API, costs money
 ```
 
@@ -92,7 +94,7 @@ Other scenarios check that emergencies are caught, that a vague request gets a c
 
 ## Limitations
 
-- The scenario eval has **not been run yet**: this was built without API access. The tools, safety screen and agent loop are tested offline only.
+- The scenario eval has not been run yet; it uses the API backend. The agent has been run live through the CLI backend: a Saturday, Kannada-speaking ENT request returned six doctors, and all six were checked against the directory.
 - Booking requests are drafts. Nothing is sent and nothing is booked.
 - The directory is a snapshot from 2026-08-26. Of the 254 doctors, 12 map to no branch and 25 have no published days, and the agent says so rather than guessing.
 - The safety screen is keyword-based and leans towards firing. It's a backstop, not triage.
