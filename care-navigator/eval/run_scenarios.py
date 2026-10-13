@@ -3,6 +3,7 @@
 
     python eval/run_scenarios.py            # all scenarios
     python eval/run_scenarios.py kidney     # just the ones whose id contains "kidney"
+    python eval/run_scenarios.py --backend bedrock   # Amazon Nova Pro on AWS credits
 
 Grading is code, not a judge model. For navigation scenarios a run passes when:
   - at least one doctor is named, and every doctor named in the answer
@@ -13,13 +14,14 @@ Grading is code, not a judge model. For navigation scenarios a run passes when:
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from navigator.agent import Navigator, trace  # noqa: E402
+from navigator.agent import BedrockNavigator, Navigator, trace  # noqa: E402
 from navigator.directory import Directory  # noqa: E402
 from navigator.tools import Toolbox  # noqa: E402
 
@@ -27,6 +29,7 @@ D = Directory()
 
 
 def named_doctors(text: str):
+    text = re.sub(r"\b(Dr|Ms|Mr|Mrs)\.", r"\1", text)  # "Dr. Madhu R" names Dr Madhu R
     return [d for d in D.doctors.values() if d.name in text]
 
 
@@ -65,19 +68,26 @@ def grade(case: dict, turn) -> list[str]:
         if e.get("language") and e["language"] not in d.languages:
             fails.append(f"{d.name}: does not list {e['language']}")
     for want in e.get("named", []):
-        if want not in turn.text:
+        if want not in re.sub(r"\b(Dr|Ms|Mr|Mrs)\.", r"\1", turn.text):
             fails.append(f"did not mention {want}")
     return fails
 
 
 def main() -> None:
-    only = sys.argv[1] if len(sys.argv) > 1 else ""
+    args = sys.argv[1:]
+    backend = "api"
+    if "--backend" in args:
+        i = args.index("--backend")
+        backend = args[i + 1]
+        del args[i : i + 2]
+    only = args[0] if args else ""
+    make = {"api": Navigator, "bedrock": BedrockNavigator}[backend]
     cases = [json.loads(l) for l in (ROOT / "eval" / "scenarios.jsonl").read_text().splitlines() if l.strip()]
     cases = [c for c in cases if only in c["id"]]
     toolbox = Toolbox(D)
     passed = 0
     for case in cases:
-        turn = Navigator(toolbox).ask(case["message"])
+        turn = make(toolbox).ask(case["message"])
         fails = grade(case, turn)
         passed += not fails
         print(f"{'PASS' if not fails else 'FAIL'}  {case['id']}  (steps={turn.steps}, tools={len(turn.tool_calls)})")

@@ -17,9 +17,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(REPO / "rag-qna"), str(REPO / "care-navigator")]
 
-from navigator.agent import CliNavigator, Navigator  # noqa: E402
+from navigator.agent import BedrockNavigator, CliNavigator, Navigator  # noqa: E402
 from navigator.tools import Toolbox  # noqa: E402
-from rxdx_qna.answer import CliQnABot, QnABot  # noqa: E402
+from rxdx_qna.answer import BedrockQnABot, CliQnABot, QnABot  # noqa: E402
 
 MAX_MESSAGE = 1000
 MAX_HISTORY = 6  # messages (3 exchanges)
@@ -62,14 +62,18 @@ def _seed_api(bot, history: list[dict]):
     bot.messages = [{"role": m["role"], "content": m["text"]} for m in history]
 
 
-def answer(kind: str, message: str, history: list[dict], backend: str) -> dict:
+def answer(kind: str, message: str, history: list[dict], backend: str, oidc_token: str | None = None) -> dict:
     message = message.strip()[:MAX_MESSAGE]
     history = clean_history(history)
     last_user = next((m["text"] for m in reversed(history) if m["role"] == "user"), None)
 
     if kind == "qna":
-        if backend == "cli":
-            bot = CliQnABot(retriever())
+        if backend in ("cli", "bedrock"):
+            if backend == "bedrock":
+                from rxdx_qna import bedrock
+                bot = BedrockQnABot(retriever(), client=bedrock.client(oidc_token))
+            else:
+                bot = CliQnABot(retriever())
             pairs = zip(history[::2], history[1::2])
             bot.history = [(u["text"], a["text"]) for u, a in pairs if u["role"] == "user"]
         else:
@@ -85,6 +89,10 @@ def answer(kind: str, message: str, history: list[dict], backend: str) -> dict:
     if backend == "cli":
         bot = CliNavigator(toolbox())
         bot.transcript = [f"{'PATIENT' if m['role'] == 'user' else 'YOU'}: {m['text']}" for m in history]
+    elif backend == "bedrock":
+        from navigator import bedrock
+        bot = BedrockNavigator(toolbox(), client=bedrock.client(oidc_token))
+        bot.messages = [{"role": m["role"], "content": [{"text": m["text"]}]} for m in history]
     else:
         bot = Navigator(toolbox())
         _seed_api(bot, history)
@@ -118,4 +126,6 @@ def page() -> bytes:
 
 
 def api_configured() -> bool:
+    if os.environ.get("BOT_BACKEND", "api") == "bedrock":
+        return bool(os.environ.get("AWS_ROLE_ARN"))
     return bool(os.environ.get("ANTHROPIC_API_KEY"))

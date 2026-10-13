@@ -33,7 +33,9 @@ How to work:
 or day that did not come back from a tool in this conversation.
 - Work out the constraints that matter: the concern, area/branch, days they can come, \
 in-clinic or teleconsultation, language, a child or an adult. Ask one short question only \
-when a missing detail would change the recommendation; otherwise search with what you have.
+when a missing detail would change the recommendation; otherwise search with what you have. \
+Once a concern maps to a speciality, call find_doctors before asking anything — show options \
+first, then ask what would narrow them.
 - Map the concern to a speciality yourself (ear infections in a child → Paediatric ENT or \
 Paediatrics; knee pain from running → Orthopaedics or Sports Medicine). If unsure of the exact \
 name, call list_specialities. If a search finds nothing, relax one constraint at a time and \
@@ -273,3 +275,108 @@ class CliNavigator:
             return ToolCall(name, args, str(e), True)
         except TypeError as e:
             return ToolCall(name, args, f"Bad arguments: {e}", True)
+
+
+def strip_reasoning(text: str) -> str:
+    """Nova sometimes writes its reasoning inline as <thinking>…</thinking> and wraps the
+    answer in <response> tags. Patients should see only the answer."""
+    import re
+
+    text = re.sub(r"<thinking>.*?(</thinking>|$)", "", text, flags=re.S)
+    return re.sub(r"</?response>", "", text).strip()
+
+
+def _bedrock_schema(schema: dict) -> dict:
+    """Strict-mode schemas say "not specified" with an explicit null. For Bedrock models,
+    nullable properties become plain optional ones; the executor fills omitted ones."""
+    props, required = {}, []
+    for name, spec in schema["properties"].items():
+        spec = dict(spec)
+        t = spec.get("type")
+        if isinstance(t, list):
+            spec["type"] = next(x for x in t if x != "null")
+            if "enum" in spec:
+                spec["enum"] = [v for v in spec["enum"] if v is not None]
+        else:
+            required.append(name)
+        props[name] = spec
+    return {"type": "object", "properties": props, "required": required}
+
+
+BEDROCK_TOOLS = {
+    "tools": [
+        {"toolSpec": {"name": t["name"], "description": t["description"],
+                      "inputSchema": {"json": _bedrock_schema(t["input_schema"])}}}
+        for t in TOOLS
+    ]
+}
+_DEFAULTS = {t["name"]: {k: ("any" if k == "mode" else None) for k in t["input_schema"]["properties"]} for t in TOOLS}
+
+
+class BedrockNavigator:
+    """The same agent on a Bedrock model (default Amazon Nova Pro) via the Converse API, which
+    has native tool use. Same tools, emergency screen, step cap and append-only history."""
+
+    def __init__(self, toolbox: Toolbox | None = None, client=None, model_id: str | None = None):
+        from . import bedrock
+
+        self.toolbox = toolbox or Toolbox()
+        self.client = client or bedrock.client()
+        self.model_id = model_id or bedrock.MODEL_ID
+        self.messages: list[dict] = []
+
+    def ask(self, message: str) -> Turn:
+        hit = screen(message)
+        if hit:
+            category, reply = hit
+            self.messages += [{"role": "user", "content": [{"text": message}]},
+                              {"role": "assistant", "content": [{"text": reply}]}]
+            return Turn(reply, emergency=category, stop_reason="emergency_screen")
+
+        self.messages.append({"role": "user", "content": [{"text": message}]})
+        turn = Turn(text="")
+        for step in range(1, MAX_STEPS + 1):
+            resp = self.client.converse(
+                modelId=self.model_id,
+                system=[{"text": SYSTEM}],
+                messages=self.messages,
+                toolConfig=BEDROCK_TOOLS,
+                inferenceConfig={"maxTokens": 2000, "temperature": 0.2},
+            )
+            turn.steps = step
+            turn.stop_reason = resp.get("stopReason")
+            u = resp.get("usage", {})
+            turn.usage["input"] += u.get("inputTokens", 0)
+            turn.usage["output"] += u.get("outputTokens", 0)
+            out = resp["output"]["message"]
+            self.messages.append(out)
+
+            uses = [b["toolUse"] for b in out.get("content", []) if "toolUse" in b]
+            if turn.stop_reason != "tool_use" or not uses:
+                turn.text = strip_reasoning("".join(b.get("text", "") for b in out.get("content", [])))
+                if turn.stop_reason == "max_tokens":
+                    turn.text += "\n\n(Answer cut short — please ask again more narrowly.)"
+                return turn
+
+            results = []
+            for u in uses:
+                args = {**_DEFAULTS.get(u["name"], {}), **(u.get("input") or {})}
+                try:
+                    call = ToolCall(u["name"], args, self.toolbox.run(u["name"], args), False)
+                except ToolError as e:
+                    call = ToolCall(u["name"], args, str(e), True)
+                except TypeError as e:
+                    call = ToolCall(u["name"], args, f"Bad arguments: {e}", True)
+                turn.tool_calls.append(call)
+                block = {"toolUseId": u["toolUseId"], "content": [{"text": call.output}]}
+                if call.is_error:
+                    block["status"] = "error"
+                results.append({"toolResult": block})
+            self.messages.append({"role": "user", "content": results})
+
+        turn.text = (
+            "I couldn't finish working that out. Please call RxDx on +91 901 409 1111, "
+            "or try asking with one constraint at a time."
+        )
+        turn.stop_reason = "max_steps"
+        return turn

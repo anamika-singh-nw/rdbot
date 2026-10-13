@@ -16,3 +16,8 @@ __pycache__/
 
 .DS_Store
 .vercel
+
+docs/internal/
+.aws/
+.codex/
+.agents/

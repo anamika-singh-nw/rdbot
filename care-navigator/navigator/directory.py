@@ -153,6 +153,11 @@ class Doctor:
     needs_verification: bool = False
     _roots: set[str] = field(default_factory=set, repr=False)
 
+    @property
+    def offers_teleconsultation(self) -> bool:
+        """Many profiles list Teleconsultation as offered without publishing its days."""
+        return "Teleconsultation" in self.consultation_types or any(s.teleconsultation for s in self.sittings)
+
     def available(self, day: str | None, mode: str, branch: str | None) -> list[Sitting]:
         out = []
         for s in self.sittings:
@@ -243,9 +248,11 @@ class Directory:
                 re.findall(r"[a-z]+", d.name.lower())
             ):
                 continue
-            if mode == "teleconsultation" and not any(s.teleconsultation for s in d.sittings) and day:
+            if mode == "teleconsultation" and not d.offers_teleconsultation:
                 continue
-            sittings = d.available(day, mode, branch)
+            # Online with no day asked: offered-but-unpublished days still count.
+            filter_mode = "any" if (mode == "teleconsultation" and not day) else mode
+            sittings = d.available(day, filter_mode, branch)
             if (branch or day) and not sittings:
                 continue
             out.append((d, sittings if (branch or day) else d.sittings))

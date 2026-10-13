@@ -27,8 +27,8 @@ def main(argv: list[str] | None = None) -> int:
     for sp in (a, c):
         sp.add_argument("-v", "--verbose", action="store_true")
         sp.add_argument(
-            "--backend", choices=["api", "cli"], default="api",
-            help="api: Anthropic API key (default). cli: your logged-in `claude` CLI, for local demos.",
+            "--backend", choices=["api", "cli", "bedrock"], default="api",
+            help="api: Anthropic API key (default). cli: your logged-in `claude` CLI. bedrock: Amazon Bedrock (Nova Pro) on AWS credits.",
         )
     args = p.parse_args(argv)
 
@@ -43,9 +43,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
-    from .agent import CliNavigator, Navigator, trace  # deferred: `tool` must work without the SDK configured
+    from .agent import BedrockNavigator, CliNavigator, Navigator, trace  # deferred: `tool` must work without the SDK configured
 
-    nav = CliNavigator() if args.backend == "cli" else Navigator()
+    nav = {"cli": CliNavigator, "bedrock": BedrockNavigator}.get(args.backend, Navigator)()
 
     def show(turn):
         if args.verbose and turn.tool_calls:

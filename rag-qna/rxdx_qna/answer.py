@@ -222,3 +222,49 @@ class CliQnABot:
         text, sources = _render_numbered(reply, hits)
         self.history.append((question, re.sub(r"\[\d+\]", "", text)))
         return Answer(text, sources, hits, "end_turn", MODEL + " (claude CLI)")
+
+
+class BedrockQnABot:
+    """Same retrieval and rules, answered by a Bedrock model (default Amazon Nova Pro) on AWS
+    credits. Citations work as in the CLI backend: numbered passages, validated markers."""
+
+    HISTORY_TURNS = 3
+
+    def __init__(self, retriever: Retriever | None = None, k: int = 8, client=None, model_id: str | None = None):
+        from . import bedrock
+
+        self.retriever = retriever or Retriever()
+        self.k = k
+        self.client = client or bedrock.client()
+        self.model_id = model_id or bedrock.MODEL_ID
+        self.history: list[tuple[str, str]] = []
+        self._last_question: str | None = None
+
+    def ask(self, question: str) -> Answer:
+        query = f"{self._last_question} {question}" if self._last_question else question
+        hits = self.retriever.search(query, k=self.k)
+        self._last_question = question
+
+        passages = "\n\n".join(
+            f"[{i}] {h.chunk.title} ({h.chunk.url})\n{h.chunk.text}" for i, h in enumerate(hits, 1)
+        )
+        messages = []
+        for q, a in self.history[-self.HISTORY_TURNS:]:
+            messages += [{"role": "user", "content": [{"text": q}]}, {"role": "assistant", "content": [{"text": a}]}]
+        messages.append({"role": "user", "content": [{"text": f"Passages:\n\n{passages}\n\nQuestion: {question}"}]})
+
+        resp = self.client.converse(
+            modelId=self.model_id,
+            system=[{"text": SYSTEM + CLI_CITATION_RULE}],
+            messages=messages,
+            inferenceConfig={"maxTokens": 1500, "temperature": 0.2},
+        )
+        reply = "".join(b.get("text", "") for b in resp["output"]["message"]["content"])
+        # Nova sometimes writes its reasoning inline; show only the answer.
+        reply = re.sub(r"<thinking>.*?(</thinking>|$)", "", reply, flags=re.S)
+        reply = re.sub(r"</?response>", "", reply)
+        text, sources = _render_numbered(reply, hits)
+        self.history.append((question, re.sub(r"\[\d+\]", "", text)))
+        u = resp.get("usage", {})
+        return Answer(text, sources, hits, resp.get("stopReason"), self.model_id,
+                      {"input": u.get("inputTokens", 0), "output": u.get("outputTokens", 0)})

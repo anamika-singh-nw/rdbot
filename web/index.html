@@ -72,6 +72,7 @@
 <body>
 <header>
   <h1>RxDx Bots</h1>
+  <p class="sub"><a href="/portfolio">Anamika Singh’s project case study and portfolio deck</a></p>
   <p class="sub">Built from rxdx.in's public pages · not affiliated with RxDx · not medical advice · confirm timings with RxDx on +91 901 409 1111</p>
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="true" data-tab="qna">Ask RxDx<small>RAG · cited answers</small></button>
@@ -169,6 +170,8 @@ function render(kind, data) {
 async function send(text) {
   text = text.trim();
   if (!text || busy) return;
+  if (!await window.portfolioPrivacy.ensureAIConsent()) return;
+  if (busy) return;
   busy = true; $(".send").disabled = true; $("textarea").value = "";
   const kind = tab;
   add("user", esc(text));

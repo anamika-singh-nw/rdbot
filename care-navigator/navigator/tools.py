@@ -129,12 +129,15 @@ class Toolbox:
     def _branch_name(self, slug: str | None, fallback: str) -> str:
         return self.d.branches.get(slug, fallback) if slug else fallback
 
-    def _sitting(self, s: Sitting) -> dict:
+    def _sitting(self, s: Sitting, tele_offered: bool) -> dict:
+        tele = s.teleconsultation or (
+            "offered, but days not published — call to arrange" if tele_offered else "not offered"
+        )
         return {
             "branch": self._branch_name(s.branch, s.clinic_label),
             "branch_id": s.branch,
             "in_clinic_days": s.in_clinic or "not published — call to check",
-            "teleconsultation_days": s.teleconsultation,
+            "teleconsultation_days": tele,
         }
 
     def _summary(self, doc: Doctor, sittings: list[Sitting]) -> dict:
@@ -144,7 +147,7 @@ class Toolbox:
             "title": doc.title or None,
             "departments": doc.departments,
             "languages": doc.languages,
-            "availability": [self._sitting(s) for s in sittings],
+            "availability": [self._sitting(s, doc.offers_teleconsultation) for s in sittings],
             "profile_url": doc.url,
             "review_search_links": review_links(doc.name),
         }

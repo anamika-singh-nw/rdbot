@@ -24,7 +24,8 @@ def test_find_filters_and_reports_resolution():
     assert r["branch_resolved_to"] == "RxDx Whitefield"
     assert "dr-madhu-r" in [d["slug"] for d in r["doctors"]]
     for d in r["doctors"]:
-        assert all("Monday" in a["in_clinic_days"] + a["teleconsultation_days"] for a in d["availability"])
+        days = lambda v: v if isinstance(v, list) else []  # noqa: E731 — a note string means no listed days
+        assert all("Monday" in days(a["in_clinic_days"]) + days(a["teleconsultation_days"]) for a in d["availability"])
 
 
 def test_results_are_capped_but_total_is_honest():
@@ -74,3 +75,17 @@ def test_every_doctor_result_has_review_search_links_not_ratings():
         assert not any(k in d for k in ("rating", "stars", "review_count"))
     madhu = json.loads(T.run("get_doctor", {"slug": "dr-madhu-r"}))
     assert unquote(madhu["review_search_links"]["google"]).endswith('"Madhu R" RxDx Bengaluru reviews')
+
+
+def test_teleconsultation_offered_without_published_days():
+    r = find(speciality="Psychiatry", mode="teleconsultation")
+    assert r["total_matches"] >= 6
+    tele = [a["teleconsultation_days"] for d in r["doctors"] for a in d["availability"]]
+    assert all(t != [] for t in tele)  # never an empty list that reads as "not offered"
+    assert any(isinstance(t, str) and "not published" in t for t in tele)
+
+
+def test_teleconsultation_filter_applies_without_a_day():
+    for d in find(mode="teleconsultation", speciality="Dermatology")["doctors"]:
+        doc = T.d.doctors[d["slug"]]
+        assert doc.offers_teleconsultation

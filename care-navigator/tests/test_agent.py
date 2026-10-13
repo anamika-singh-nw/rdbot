@@ -133,3 +133,33 @@ def test_cli_navigator_emergency_skips_the_cli():
 
     nav = CliNavigator(ask=lambda *a, **k: (_ for _ in ()).throw(AssertionError("called")))
     assert nav.ask("she can't breathe").emergency == "breathing"
+
+
+def test_reasoning_tags_are_stripped():
+    from navigator.agent import strip_reasoning
+
+    assert strip_reasoning("<thinking>plan</thinking> <response>Dr A, Monday.</response>") == "Dr A, Monday."
+    assert strip_reasoning("<thinking>unterminated") == ""
+
+
+def test_bedrock_navigator_tool_loop():
+    from navigator.agent import BedrockNavigator
+
+    turns = [
+        {"stopReason": "tool_use", "usage": {"inputTokens": 5, "outputTokens": 1},
+         "output": {"message": {"role": "assistant", "content": [
+             {"toolUse": {"toolUseId": "u1", "name": "find_doctors", "input": {"speciality": "Dermatology", "branch": "Whitefield", "day": "Monday"}}}]}}},
+        {"stopReason": "end_turn", "usage": {"inputTokens": 5, "outputTokens": 1},
+         "output": {"message": {"role": "assistant", "content": [{"text": "<thinking>x</thinking>Dr Madhu R, Monday."}]}}},
+    ]
+    sent = []
+    client = NS(converse=lambda **kw: sent.append(kw) or turns.pop(0))
+    nav = BedrockNavigator(client=client, model_id="test-model")
+    turn = nav.ask("skin doctor Whitefield Monday")
+    assert turn.text == "Dr Madhu R, Monday."
+    assert turn.tool_calls[0].input["mode"] == "any"  # omitted optional args are filled
+    assert "dr-madhu-r" in turn.tool_calls[0].output
+    result = nav.messages[2]["content"][0]["toolResult"]
+    assert result["toolUseId"] == "u1" and "status" not in result
+    schema = sent[0]["toolConfig"]["tools"][2]["toolSpec"]["inputSchema"]["json"]
+    assert schema["properties"]["day"]["type"] == "string" and None not in schema["properties"]["day"]["enum"]

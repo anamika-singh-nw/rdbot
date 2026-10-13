@@ -44,8 +44,8 @@ def main(argv: list[str] | None = None) -> int:
     for sp in (a, c):
         sp.add_argument("-v", "--verbose", action="store_true")
         sp.add_argument(
-            "--backend", choices=["api", "cli"], default="api",
-            help="api: Anthropic API key (default). cli: your logged-in `claude` CLI, for local demos.",
+            "--backend", choices=["api", "cli", "bedrock"], default="api",
+            help="api: Anthropic API key (default). cli: your logged-in `claude` CLI. bedrock: Amazon Bedrock (Nova Pro) on AWS credits.",
         )
     args = p.parse_args(argv)
 
@@ -59,9 +59,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{h.score:.4f}  {h.chunk.id:45}  {h.chunk.text[:90].replace(chr(10), ' ')}")
         return 0
 
-    from .answer import CliQnABot, QnABot  # deferred: `search` must work without the SDK configured
+    from .answer import BedrockQnABot, CliQnABot, QnABot  # deferred: `search` must work without the SDK configured
 
-    bot = CliQnABot(retriever) if args.backend == "cli" else QnABot(retriever)
+    bot = {"cli": CliQnABot, "bedrock": BedrockQnABot}.get(args.backend, QnABot)(retriever)
     if args.cmd == "ask":
         _print_answer(bot.ask(args.question), args.verbose)
         return 0
